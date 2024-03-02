@@ -8,15 +8,18 @@ public class Main {
     ExecutorService executorService;
     Runnable runnableTask;
     List<Callable<String>> callableTasks;
+    static int timeout = 10;
 
-    public static void main(String[] args) throws ExecutionException, InterruptedException {
+    ScheduledExecutorService scheduledExecutorService;
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException, Exception {
         System.out.println("Hello world!");
 
         Main main = new Main();
 
         main.runnableTask = () -> {
             try {
-                TimeUnit.MILLISECONDS.sleep(300);
+                TimeUnit.MILLISECONDS.sleep(timeout);
                 System.out.println("\nrunnableTask executed");
             } catch (InterruptedException interruptedException) {
                 interruptedException.printStackTrace();
@@ -24,17 +27,17 @@ public class Main {
         };
 
         Callable<String> callableTask1 = () -> {
-            TimeUnit.MILLISECONDS.sleep(300);
+            TimeUnit.MILLISECONDS.sleep(timeout);
             System.out.println("callableTask1 executed");
             return "string from callableTask1";
         };
         Callable<String> callableTask2 = () -> {
-            TimeUnit.MILLISECONDS.sleep(300);
+            TimeUnit.MILLISECONDS.sleep(timeout);
             System.out.println("callableTask2 executed");
             return "string from callableTask2";
         };
         Callable<String> callableTask3 = () -> {
-            TimeUnit.MILLISECONDS.sleep(300);
+            TimeUnit.MILLISECONDS.sleep(timeout);
             System.out.println("callableTask3 executed");
             return "string from callableTask3";
         };
@@ -43,12 +46,25 @@ public class Main {
         main.callableTasks.add(callableTask2);
         main.callableTasks.add(callableTask3);
 
-        main.executorServiceFixedPool();
-        main.executorServiceThreadPoolExecutor();
+//        main.executorServiceFixedPool();
+//        main.executorServiceThreadPoolExecutor();
+//        main.runAnyTaskInCollection();
+//        main.runAllTasksInCollection();
+//        main.showdownExecutorService();
 
-        main.runAnyTaskInCollection();
+        main.createScheduledExecutorService();
+        main.shutdownScheduledExecutorService();
+    }
 
-        main.runAllTasksInCollection();
+    private void showdownExecutorService() {
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination((timeout * 5), TimeUnit.MILLISECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException interruptedException) {
+            executorService.shutdownNow();
+        }
     }
 
     public void executorServiceFixedPool() {
@@ -64,10 +80,8 @@ public class Main {
         Future<String> stringFuture = executorService.submit(callableTasks.get(0));
         try {
             System.out.println("stringFuture: " + stringFuture.get());
-        } catch (ExecutionException executionException) {
-            executionException.printStackTrace();
-        } catch (InterruptedException interruptedException) {
-            interruptedException.printStackTrace();
+        } catch (InterruptedException | ExecutionException exception) {
+            exception.printStackTrace();
         }
     }
 
@@ -77,18 +91,39 @@ public class Main {
         System.out.println("result of invokeAny of callableTasks: " + result);
     }
 
-    public void runAllTasksInCollection() throws ExecutionException, InterruptedException {
+    public void runAllTasksInCollection() throws Exception {
         System.out.println("\nRunning all task in a collection...");
         List<Future<String>> listOfFutures = executorService.invokeAll(callableTasks);
         listOfFutures.stream().forEach((future) -> {
             try {
-                String result = future.get();
+                //blocking call
+                String result = future.get(100, TimeUnit.MILLISECONDS);
                 System.out.println("stringFutureResult: " + result);
-            } catch (ExecutionException e) {
-                throw new RuntimeException(e);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            } catch (InterruptedException | ExecutionException | TimeoutException exception) {
+                throw new RuntimeException(exception);
             }
         });
+    }
+
+    private void createScheduledExecutorService() {
+        scheduledExecutorService = Executors.newScheduledThreadPool(10);
+        scheduledExecutorService.schedule(runnableTask, 1, TimeUnit.MILLISECONDS);
+
+//        System.out.println("scheduling at fixed rate...");
+//        scheduledExecutorService.scheduleAtFixedRate(runnableTask, 10, 1000, TimeUnit.MILLISECONDS);
+
+        System.out.println("scheduling with fixed delay...");
+        scheduledExecutorService.scheduleWithFixedDelay(runnableTask, 10, 1000, TimeUnit.MILLISECONDS);
+    }
+
+    private void shutdownScheduledExecutorService() {
+        scheduledExecutorService.shutdown();
+        try {
+            if (!scheduledExecutorService.awaitTermination(240, TimeUnit.SECONDS)) {
+                scheduledExecutorService.shutdownNow();
+            }
+        } catch (InterruptedException interruptedException) {
+            scheduledExecutorService.shutdownNow();
+        }
     }
 }
